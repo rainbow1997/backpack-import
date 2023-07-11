@@ -6,6 +6,7 @@ use BackpackImport\Models\CsvData;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Route;
 use CsvReader;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 /**
  *
@@ -147,25 +148,13 @@ trait ImportOperation
     public function importParse(Request $request)
     {
         $path = $request->file('csv_file')->getRealPath();
-        $csv  = CsvReader::FromFile($path);
-        $data = $csv->getRows();
-
-        $encodings = [
-            'CP1251',
-            'UCS-2LE',
-            'UCS-2BE',
-            'UTF-8',
-            'UTF-16',
-            'UTF-16BE',
-            'UTF-16LE',
-            'UTF-32',
-            'CP866',
-            'ISO-8859-1'
-          ];
+        $spreadsheet = IOFactory::load($path);
+        $worksheet = $spreadsheet->getActiveSheet();
+        $data = $worksheet->toArray();
 
         $csvDataFile = CsvData::create([
             'csv_filename' => $request->file('csv_file')->getClientOriginalName(),
-            'csv_data' => json_encode(mb_convert_encoding($data, 'UTF-8', $encodings))
+            'csv_data' => json_encode(mb_convert_encoding($data, 'UTF-8', 'auto'))
         ]);
 
         $csvData = array_slice($data, 0, 10);
