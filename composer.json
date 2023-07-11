@@ -9,7 +9,8 @@
         "email": "ckhandla94@gmail.com"
     }],
     "require": {
-        "atk14/csv-reader": "^1.1"
+        "atk14/csv-reader": "^1.1",
+        "phpoffice/phpspreadsheet": "^1.29"
     },
     "autoload": {
         "psr-4": {
