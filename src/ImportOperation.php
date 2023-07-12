@@ -1,12 +1,17 @@
 <?php
 namespace BackpackImport;
-
 use Illuminate\Http\Request;
 use BackpackImport\Models\CsvData;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Route;
 use CsvReader;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+
+use PhpOffice\PhpSpreadsheet\Writer\Csv;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 
 /**
  *
@@ -109,31 +114,40 @@ trait ImportOperation
      *
      * @return \Symfony\Component\HttpFoundation\StreamedResponse
      */
-    public function importFormatDownload()
+     public function importFormatDownload()
     {
-        // figure out the importable fields.
+        // Figure out the importable fields.
         $importFields = $this->getImportableFields();
 
-        $headers = array(
-            "Content-type" => "text/csv",
-            "Content-Disposition" => "attachment; filename=" . $this->importSampleFilename(),
-            "Pragma" => "no-cache",
-            "Cache-Control" => "must-revalidate, post-check=0, pre-check=0",
-            "Expires" => "0"
-        );
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
 
-        $columns = [];
-        foreach ($importFields as $idx_1 => $importField) {
-            $columns[] = $importField['label'];
+        $columnIndex = 1;
+        foreach ($importFields as $importField) {
+            $label = $importField['label'];
+            $sourceEncoding = mb_detect_encoding($label, mb_detect_order(), true);
+            if ($sourceEncoding === 'UTF-8') {
+                $label = mb_convert_encoding($label, 'UTF-8', $sourceEncoding);
+            }
+            $cell = Coordinate::stringFromColumnIndex($columnIndex) . '1';
+            $sheet->setCellValue($cell, $label);
+            $columnIndex++;
         }
 
-        $callback = function () use ($columns) {
-            $file = fopen('php://output', 'w');
-            fputcsv($file, $columns);
+        // Set the auto filter on the first row
+        $lastColumn = Coordinate::stringFromColumnIndex($columnIndex - 1);
+        $sheet->setAutoFilter('A1:' . $lastColumn . '1');
 
-            fclose($file);
-        };
-        return response()->stream($callback, 200, $headers);
+        $writer = new Xlsx($spreadsheet);
+        $filename = $this->importSampleFilename();
+        $directory = storage_path('app/tmp');
+        if (!file_exists($directory)) {
+            mkdir($directory, 0755, true);
+        }
+        $path = $directory . DIRECTORY_SEPARATOR . $filename . '.xlsx';
+        $writer->save($path);
+
+        return response()->download($path)->deleteFileAfterSend(true);
     }
 
     /**
